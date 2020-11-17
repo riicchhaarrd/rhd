@@ -2,6 +2,8 @@
 #define HASH_MAP_H
 
 #include <string.h>
+#include <malloc.h>
+#include <assert.h>
 #include "hash_string.h"
 /* we'll use a custom made linked list instead of the linked list.. */
 
