@@ -2,10 +2,13 @@
 #define HASH_MAP_H
 
 #include <string.h>
-#include <malloc.h>
 #include <assert.h>
+#include "memory.h"
 #include "hash_string.h"
 /* we'll use a custom made linked list instead of the linked list.. */
+
+#define HM_STATIC static
+#define HM_INLINE inline
 
 struct hash_bucket_entry
 {
@@ -30,12 +33,29 @@ struct hash_map
 	size_t bucket_size;
 	size_t data_size;
 	size_t num_entries;
+	
+	deallocator_t on_key_removal_fn;
 	int distinct;
 };
 
-struct hash_bucket *hash_allocate_buckets(size_t num_buckets)
+#ifndef HASH_MAP_IMPL
+//public API
+extern struct hash_map *hash_map_create_data(size_t data_size);
+extern void hash_map_destroy(struct hash_map **hmp);
+extern void *hash_map_find(struct hash_map *ht, const char *key);
+extern int hash_map_insert_data(struct hash_map *ht, const char *key, unsigned char *data, size_t data_size);
+extern void hash_map_dump(struct hash_map *hm);
+extern void hash_map_set_on_key_removal(struct hash_map *hm, deallocator_t fn);
+#else
+
+void hash_map_set_on_key_removal(struct hash_map *hm, deallocator_t fn)
 {
-	struct hash_bucket *buckets = malloc(sizeof(struct hash_bucket) * num_buckets);
+	hm->on_key_removal_fn = fn;
+}
+
+HM_STATIC struct hash_bucket *hash_allocate_buckets(size_t num_buckets)
+{
+	struct hash_bucket *buckets = memory_allocate(sizeof(struct hash_bucket) * num_buckets);
 	for(size_t i = 0; i < num_buckets; ++i)
 	{
 		buckets[i].head = NULL; //all empty lists..
@@ -44,18 +64,19 @@ struct hash_bucket *hash_allocate_buckets(size_t num_buckets)
 	return buckets;
 }
 
-struct hash_map *hash_map_create(size_t data_size)
+struct hash_map *hash_map_create_data(size_t data_size)
 {
-	struct hash_map *ht = malloc(sizeof(struct hash_map));
+	struct hash_map *ht = memory_allocate(sizeof(struct hash_map));
 	ht->num_entries = 0;
 	ht->buckets = hash_allocate_buckets(HASH_BUCKET_SIZE);
 	ht->bucket_size = HASH_BUCKET_SIZE;
 	ht->data_size = data_size;
 	ht->distinct = 1;
+	ht->on_key_removal_fn = NULL;
 	return ht;
 }
 
-void hash_bucket_free(struct hash_bucket *bucket)
+HM_STATIC void hash_bucket_free(struct hash_map *hm, struct hash_bucket *bucket)
 {
 	if(bucket->head == NULL)
 		return;
@@ -66,13 +87,15 @@ void hash_bucket_free(struct hash_bucket *bucket)
 	{
 		struct hash_bucket_entry *tmp = cur;
 		cur = cur->next;
-		free(tmp->key);
-		free(tmp);
+		if(hm->on_key_removal_fn)
+			hm->on_key_removal_fn(tmp->data);
+		memory_deallocate(tmp->key);
+		memory_deallocate(tmp);
 	}
 	bucket->head = NULL;
 }
 
-void hash_map_free(struct hash_map **hmp)
+void hash_map_destroy(struct hash_map **hmp)
 {
 	struct hash_map *hm = *hmp;
 	
@@ -81,15 +104,15 @@ void hash_map_free(struct hash_map **hmp)
 		struct hash_bucket *bucket = &hm->buckets[i];
 		if(bucket->head == NULL) //empty bucket skip
 			continue;
-		hash_bucket_free(bucket);
+		hash_bucket_free(hm, bucket);
 	}
-	free(hm->buckets);
+	memory_deallocate(hm->buckets);
 	
-	free(hm);
+	memory_deallocate(hm);
 	*hmp = NULL;
 }
 
-struct hash_bucket_entry *hash_bucket_find(struct hash_bucket *bucket, const char *key, unsigned long hashed_key)
+HM_STATIC struct hash_bucket_entry *hash_bucket_find(struct hash_bucket *bucket, const char *key, unsigned long hashed_key)
 {
 	if(bucket->head == NULL)
 		return NULL; //empty bucket
@@ -107,11 +130,12 @@ struct hash_bucket_entry *hash_bucket_find(struct hash_bucket *bucket, const cha
 	return NULL;
 }
 
-struct hash_bucket_entry *hash_map_find(struct hash_map *ht, const char *key)
+void *hash_map_find(struct hash_map *ht, const char *key)
 {
 	unsigned long hashed_key = hash_string(key);
 	struct hash_bucket *bucket = &ht->buckets[hashed_key % ht->bucket_size];
-	return hash_bucket_find(bucket, key, hashed_key);
+	struct hash_bucket_entry *entry = hash_bucket_find(bucket, key, hashed_key);
+	return entry ? entry->data : NULL;
 }
 
 void hash_map_dump(struct hash_map *hm)
@@ -119,23 +143,23 @@ void hash_map_dump(struct hash_map *hm)
 	for(size_t i = 0; i < hm->bucket_size; ++i)
 	{
 		struct hash_bucket *bucket = &hm->buckets[i];
-		printf("bucket %d: %d entries\n", i, bucket->size);
+		printf("bucket %lu: %lu entries\n", i, bucket->size);
 	}
 }
 
-struct hash_bucket_entry *hash_bucket_entry_create(const char *key, unsigned char *data, size_t data_size)
+HM_STATIC struct hash_bucket_entry *hash_bucket_entry_create(const char *key, unsigned char *data, size_t data_size)
 {
 	unsigned long hashed_key = hash_string(key);
-	struct hash_bucket_entry *entry = malloc(sizeof(struct hash_bucket_entry) + data_size);
+	struct hash_bucket_entry *entry = memory_allocate(sizeof(struct hash_bucket_entry) + data_size);
 	entry->hash = hashed_key;
-	entry->key = malloc(strlen(key) + 1); //DON'T FORGET TO FREE THIS KEY
+	entry->key = memory_allocate(strlen(key) + 1); //DON'T FORGET TO FREE THIS KEY
 	strcpy(entry->key, key);
 	entry->next = NULL;
 	memcpy(entry->data, data, data_size);
 	return entry;
 }
 
-void hash_bucket_insert(struct hash_bucket *bucket, const char *key, unsigned char *data, size_t data_size)
+HM_STATIC void hash_bucket_insert(struct hash_bucket *bucket, const char *key, unsigned char *data, size_t data_size)
 {
 	struct hash_bucket_entry *entry = hash_bucket_entry_create(key, data, data_size);
 	
@@ -153,7 +177,7 @@ void hash_bucket_insert(struct hash_bucket *bucket, const char *key, unsigned ch
 	}
 }
 
-void hash_map_rehash(struct hash_map *hm)
+HM_STATIC void hash_map_rehash(struct hash_map *hm)
 {
 	size_t new_bucket_size = hm->bucket_size * 2;
 	struct hash_bucket *new_buckets = hash_allocate_buckets(new_bucket_size);
@@ -172,9 +196,9 @@ void hash_map_rehash(struct hash_map *hm)
 			cur = cur->next;
 		}
 		//free old bucket
-		hash_bucket_free(bucket);
+		hash_bucket_free(hm, bucket);
 	}
-	free(hm->buckets);
+	memory_deallocate(hm->buckets);
 	hm->bucket_size = new_bucket_size;
 	hm->buckets = new_buckets;
 }
@@ -205,8 +229,10 @@ int hash_map_insert_data(struct hash_map *ht, const char *key, unsigned char *da
 	return 0;
 }
 
-#define hash_map_new(type) \
-	hash_map_create(sizeof(type))
+#endif
+
+#define hash_map_create(type) \
+	hash_map_create_data(sizeof(type))
 
 #define hash_map_insert(ht, key, value) \
 	hash_map_insert_data(ht, key, (unsigned char*)&(value), sizeof(value))
