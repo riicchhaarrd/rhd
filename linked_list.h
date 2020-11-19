@@ -6,8 +6,6 @@
 /*
 
 TODO:
-doubly linked list, just add a prev field
-end field so we know the end of the linked list
 for binary search, a mid point, requires more calculations though when inserting and removing..
 
 */
@@ -25,7 +23,7 @@ struct linked_list
 	struct linked_list_node *head;
 	struct linked_list_node *tail;
 	size_t data_size;
-	deallocator_t on_node_delete_fn;
+	void* on_node_delete_fn;
 };
 
 #define linked_list_foreach(list, type, var_name, body) \
@@ -38,6 +36,16 @@ struct linked_list
 		body \
 	} \
 	} while(0)
+#define linked_list_foreach_node(list, var_name, body) \
+	do { \
+	struct linked_list_node *var_name = (list) ? (list)->head : NULL; \
+	while(var_name != NULL) \
+	{ \
+		body \
+		var_name = var_name->next; \
+	} \
+	} while(0)
+#define linked_list_node_value(x) ((void*)(x)->data)
 #define linked_list_reversed_foreach(list, type, var_name, body) \
 	do { \
 	struct linked_list_node *cur = (list) ? (list)->tail : NULL; \
@@ -68,10 +76,11 @@ extern void linked_list_free_with_deleter(struct linked_list *list, deallocator_
 extern void* linked_list_append_(struct linked_list *list, unsigned char *data, size_t data_size);
 extern void* linked_list_prepend_(struct linked_list *list, unsigned char *data, size_t data_size);
 extern void linked_list_init_with_data_size(struct linked_list *, size_t);
-extern void linked_list_set_node_value_finalizer(struct linked_list*, deallocator_t);
+extern void linked_list_set_node_value_finalizer(struct linked_list*, void*);
+extern int linked_list_erase_node(struct linked_list *list, struct linked_list_node *node);
 #else
 
-void linked_list_set_node_value_finalizer(struct linked_list *list, deallocator_t fn)
+void linked_list_set_node_value_finalizer(struct linked_list *list, void *fn)
 {
 	list->on_node_delete_fn = fn;
 }
@@ -99,6 +108,35 @@ struct linked_list_node *linked_list_create_node_(unsigned char *data, size_t da
 	list->data_size = data_size;
 	memcpy(list->data, data, data_size);
 	return list;
+}
+
+int linked_list_erase_node(struct linked_list *list, struct linked_list_node *node)
+{
+	if(!list)
+		return 1;
+	if(!node)
+		return 1;
+	if(list->head == node)
+	{
+		list->head = node->next;
+		if(list->head)
+			list->head->prev = NULL; //no previous node anymore.. we're head
+	}
+	if(list->tail == node)
+	{
+		list->tail = node->prev;
+		if(list->tail)
+			list->tail->next = NULL; //no next node anymore.. we're (also) tail
+	}
+	if(node->next)
+		node->next->prev = node->prev;
+	if(node->prev)
+		node->prev->next = node->next;
+
+	if(list->on_node_delete_fn)
+		((void(*)(void*))list->on_node_delete_fn)(node->data);
+	memory_deallocate(node);
+	return 0;
 }
 
 void* linked_list_prepend_(struct linked_list *list, unsigned char *data, size_t data_size)
@@ -146,7 +184,7 @@ void* linked_list_append_(struct linked_list *list, unsigned char *data, size_t 
 	return cur->next->data;
 }
 
-void linked_list_free_with_deleter(struct linked_list *list, deallocator_t fn)
+void linked_list_free_with_deleter(struct linked_list *list, void* fn)
 {
 	struct linked_list_node *cur = list->head;
 	while(cur != NULL)
@@ -154,7 +192,7 @@ void linked_list_free_with_deleter(struct linked_list *list, deallocator_t fn)
 		struct linked_list_node *tmp = cur;
 		cur = cur->next;
 		if(fn)
-			fn(tmp->data);
+			((void(*)(void*))fn)(tmp->data);
 		memory_deallocate(tmp);
 	}
 	list->head = NULL;
