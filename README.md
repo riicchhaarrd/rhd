@@ -112,7 +112,7 @@ int main(void)
 
 ```c
 #define HASH_MAP_IMPL
-#include "hash_map.h"
+#include "../hash_map.h"
 
 static void on_remove_value(char **p)
 {
