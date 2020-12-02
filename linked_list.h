@@ -132,9 +132,12 @@ int linked_list_erase_node(struct linked_list *list, struct linked_list_node *no
 		node->next->prev = node->prev;
 	if(node->prev)
 		node->prev->next = node->next;
+	
+	void (*callback_fn)(void*);
+	*(void**)(&callback_fn) = list->on_node_delete_fn;
 
 	if(list->on_node_delete_fn)
-		((void(*)(void*))list->on_node_delete_fn)(node->data);
+		callback_fn(node->data);
 	memory_deallocate(node);
 	return 0;
 }
@@ -191,8 +194,12 @@ void linked_list_free_with_deleter(struct linked_list *list, void* fn)
 	{
 		struct linked_list_node *tmp = cur;
 		cur = cur->next;
+		
+		void (*callback_fn)(void*);
+		*(void**)(&callback_fn) = fn;
+		
 		if(fn)
-			((void(*)(void*))fn)(tmp->data);
+			callback_fn(tmp->data);
 		memory_deallocate(tmp);
 	}
 	list->head = NULL;
