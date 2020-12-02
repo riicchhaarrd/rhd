@@ -18,12 +18,14 @@ struct linked_list_node
 	unsigned char data[];
 };
 
+typedef void (*linked_list_node_finalizer_callback_t)(void*);
+
 struct linked_list
 {
 	struct linked_list_node *head;
 	struct linked_list_node *tail;
 	size_t data_size;
-	void* on_node_delete_fn;
+	linked_list_node_finalizer_callback_t on_node_delete_fn;
 };
 
 #define linked_list_foreach(list, type, var_name, body) \
@@ -72,15 +74,16 @@ struct linked_list
 #ifndef LINKED_LIST_IMPL
 extern struct linked_list* linked_list_create_with_data_size(size_t data_size);
 extern void linked_list_destroy(struct linked_list **list);
-extern void linked_list_free_with_deleter(struct linked_list *list, deallocator_t fn);
+extern void linked_list_free_with_deleter(struct linked_list *list, linked_list_node_finalizer_callback_t fn);
 extern void* linked_list_append_(struct linked_list *list, unsigned char *data, size_t data_size);
 extern void* linked_list_prepend_(struct linked_list *list, unsigned char *data, size_t data_size);
 extern void linked_list_init_with_data_size(struct linked_list *, size_t);
-extern void linked_list_set_node_value_finalizer(struct linked_list*, void*);
+
+extern void linked_list_set_node_value_finalizer(struct linked_list*, linked_list_node_finalizer_callback_t);
 extern int linked_list_erase_node(struct linked_list *list, struct linked_list_node *node);
 #else
 
-void linked_list_set_node_value_finalizer(struct linked_list *list, void *fn)
+void linked_list_set_node_value_finalizer(struct linked_list *list, linked_list_node_finalizer_callback_t fn)
 {
 	list->on_node_delete_fn = fn;
 }
@@ -132,12 +135,9 @@ int linked_list_erase_node(struct linked_list *list, struct linked_list_node *no
 		node->next->prev = node->prev;
 	if(node->prev)
 		node->prev->next = node->next;
-	
-	void (*callback_fn)(void*);
-	*(void**)(&callback_fn) = list->on_node_delete_fn;
 
 	if(list->on_node_delete_fn)
-		callback_fn(node->data);
+		list->on_node_delete_fn(node->data);
 	memory_deallocate(node);
 	return 0;
 }
@@ -187,7 +187,7 @@ void* linked_list_append_(struct linked_list *list, unsigned char *data, size_t 
 	return cur->next->data;
 }
 
-void linked_list_free_with_deleter(struct linked_list *list, void* fn)
+void linked_list_free_with_deleter(struct linked_list *list, linked_list_node_finalizer_callback_t fn)
 {
 	struct linked_list_node *cur = list->head;
 	while(cur != NULL)
@@ -195,11 +195,8 @@ void linked_list_free_with_deleter(struct linked_list *list, void* fn)
 		struct linked_list_node *tmp = cur;
 		cur = cur->next;
 		
-		void (*callback_fn)(void*);
-		*(void**)(&callback_fn) = fn;
-		
 		if(fn)
-			callback_fn(tmp->data);
+			fn(tmp->data);
 		memory_deallocate(tmp);
 	}
 	list->head = NULL;
