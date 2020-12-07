@@ -1,16 +1,21 @@
 #ifndef HEAP_STRING_H
 #define HEAP_STRING_H
 
+#include <stdio.h> //vsnprintf
 #include <malloc.h>
 #include <string.h>
 #include <stdarg.h>
 
+//msvc warning C4200: nonstandard extension used: zero-sized array in struct/union
+#pragma warning( push )
+#pragma warning( disable : 4200 )
 struct heap_string_header
 {
 	int capacity;
 	int size;
 	char buf[];
 };
+#pragma warning( pop )
 
 #define HEAP_STRING_HDR(s) (struct heap_string_header *)( ( s ) - sizeof(struct heap_string_header) )
 

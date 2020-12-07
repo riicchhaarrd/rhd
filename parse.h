@@ -17,8 +17,9 @@ int parse_ident(FILE *fp, heap_string *ident);
 int parse_character(FILE *fp, int ch);
 int parse_characters(FILE *fp, const char *str);
 int parse_ident_to_buffer(FILE *fp, char *buf, size_t bufsz, int *overflow);
+int fpeekc(FILE *fp);
 #else
-static int fpeekc(FILE *fp)
+int fpeekc(FILE *fp)
 {
     int c = fgetc(fp);
     ungetc(c, fp);
@@ -29,7 +30,10 @@ void parse_whitespace(FILE *fp)
 {
 	while(1)
 	{
-		if(fpeekc(fp) == EOF || !isspace(fpeekc(fp)))
+		int pk = fpeekc(fp);
+		if(pk == EOF)
+			return;
+		if(pk != ' ' && pk != '\t')
 			return;
 		fgetc(fp);
 	}

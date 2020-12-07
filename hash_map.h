@@ -10,6 +10,9 @@
 #define HM_STATIC static
 #define HM_INLINE inline
 
+//msvc warning C4200: nonstandard extension used: zero-sized array in struct/union
+#pragma warning( push )
+#pragma warning( disable : 4200 )
 struct hash_bucket_entry
 {
 	struct hash_bucket_entry *next;
@@ -17,6 +20,7 @@ struct hash_bucket_entry
 	char *key;
 	unsigned char data[];
 };
+#pragma warning( pop )
 
 struct hash_bucket
 {
@@ -140,11 +144,13 @@ void *hash_map_find(struct hash_map *ht, const char *key)
 
 void hash_map_dump(struct hash_map *hm)
 {
+	#if 0
 	for(size_t i = 0; i < hm->bucket_size; ++i)
 	{
 		struct hash_bucket *bucket = &hm->buckets[i];
 		printf("bucket %lu: %lu entries\n", i, bucket->size);
 	}
+	#endif
 }
 
 HM_STATIC struct hash_bucket_entry *hash_bucket_entry_create(const char *key, unsigned char *data, size_t data_size)
