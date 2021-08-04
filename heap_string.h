@@ -34,6 +34,7 @@ size_t heap_string_capacity(heap_string *s);
 size_t heap_string_size(heap_string *s);
 void heap_string_push(heap_string *s, int i);
 void heap_string_appendf(heap_string *s, const char *fmt, ...);
+heap_string heap_string_read_from_text_file( const char* filename );
 #else
 heap_string heap_string_alloc(int n)
 {
@@ -41,6 +42,27 @@ heap_string heap_string_alloc(int n)
 	d->capacity = n;
 	d->size = 0;
 	return (heap_string)&d->buf[0];
+}
+
+heap_string heap_string_read_from_text_file( const char* filename )
+{
+	heap_string data = NULL;
+
+	FILE* fp = fopen( filename, "r" );
+	if ( !fp )
+		return data;
+	fseek( fp, 0, SEEK_END );
+	size_t fs = ftell( fp );
+	rewind( fp );
+	data = heap_string_alloc( fs + 1 );
+	fread( data, fs, 1, fp );
+    
+	struct heap_string_header *hdr = HEAP_STRING_HDR(data);
+	hdr->buf[fs] = '\0';
+    	hdr->size = fs;
+
+	fclose( fp );
+	return data;
 }
 
 //not binary safe
@@ -89,7 +111,7 @@ void heap_string_push(heap_string *s, int i)
 
 	if (!*s || newsize + 1 >= hdr->capacity)
 	{
-		heap_string n = heap_string_alloc(newsize * 2 + 1);
+		heap_string n = heap_string_alloc(newsize + 2); //slower, but less likely to run into allocation issues due to large N in successive calls
 
 		if (*s)
 		{
