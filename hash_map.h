@@ -50,6 +50,7 @@ extern void *hash_map_find(struct hash_map *ht, const char *key);
 extern int hash_map_insert_data(struct hash_map *ht, const char *key, unsigned char *data, size_t data_size);
 extern void hash_map_dump(struct hash_map *hm);
 extern void hash_map_set_on_key_removal(struct hash_map *hm, deallocator_t fn);
+extern int hash_map_remove_key(struct hash_map **hmp, const char *key);
 #else
 
 void hash_map_set_on_key_removal(struct hash_map *hm, deallocator_t fn)
@@ -140,6 +141,30 @@ void *hash_map_find(struct hash_map *ht, const char *key)
 	struct hash_bucket *bucket = &ht->buckets[hashed_key % ht->bucket_size];
 	struct hash_bucket_entry *entry = hash_bucket_find(bucket, key, hashed_key);
 	return entry ? entry->data : NULL;
+}
+
+int hash_map_remove_key(struct hash_map **hmp, const char *key)
+{
+	struct hash_map *ht = *hmp;
+	unsigned long hashed_key = hash_string(key);
+	struct hash_bucket *bucket = &ht->buckets[hashed_key % ht->bucket_size];
+	struct hash_bucket_entry *entry = hash_bucket_find(bucket, key, hashed_key);
+    if(!entry)
+        return 0;
+    
+    struct hash_bucket_entry **cur = &bucket->head;
+    while((*cur) != entry)
+        cur = &(*cur)->next;
+    *cur = entry->next;
+
+	if ( ht->on_key_removal_fn )
+		ht->on_key_removal_fn( entry->data );
+	memory_deallocate( entry->key );
+	memory_deallocate( entry );
+
+	--bucket->size;
+    --ht->num_entries;
+	return 1;
 }
 
 void hash_map_dump(struct hash_map *hm)
