@@ -48,7 +48,8 @@ heap_string heap_string_read_from_text_file( const char* filename )
 {
 	heap_string data = NULL;
 
-	FILE* fp = fopen( filename, "r" );
+	FILE* fp;
+	fopen_s(&fp, filename, "r");
 	if ( !fp )
 		return data;
 	fseek( fp, 0, SEEK_END );

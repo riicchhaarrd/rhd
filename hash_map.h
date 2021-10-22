@@ -183,8 +183,9 @@ HM_STATIC struct hash_bucket_entry *hash_bucket_entry_create(const char *key, un
 	unsigned long hashed_key = hash_string(key);
 	struct hash_bucket_entry *entry = memory_allocate(sizeof(struct hash_bucket_entry) + data_size);
 	entry->hash = hashed_key;
-	entry->key = memory_allocate(strlen(key) + 1); //DON'T FORGET TO FREE THIS KEY
-	strcpy(entry->key, key);
+	int kl = strlen(key);
+	entry->key = memory_allocate(kl + 1); //DON'T FORGET TO FREE THIS KEY
+	strncpy_s(entry->key, kl + 1, key, kl);
 	entry->next = NULL;
 	memcpy(entry->data, data, data_size);
 	return entry;
@@ -267,5 +268,4 @@ int hash_map_insert_data(struct hash_map *ht, const char *key, unsigned char *da
 
 #define hash_map_insert(ht, key, value) \
 	hash_map_insert_data(ht, key, (unsigned char*)&(value), sizeof(value))
-
 #endif
