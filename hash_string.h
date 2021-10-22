@@ -16,4 +16,6 @@ hash_buffer(unsigned char *str)
 
 #define hash_string(str) hash_buffer((unsigned char*)str)
 
+typedef unsigned long hash_t;
+
 #endif
