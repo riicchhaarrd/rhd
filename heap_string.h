@@ -1,6 +1,7 @@
 #ifndef HEAP_STRING_H
 #define HEAP_STRING_H
 
+#include "std.h"
 #include <stdio.h> //vsnprintf
 #include <malloc.h>
 #include <string.h>
@@ -49,7 +50,7 @@ heap_string heap_string_read_from_text_file( const char* filename )
 	heap_string data = NULL;
 
 	FILE* fp;
-	fopen_s(&fp, filename, "r");
+	std_fopen_s(&fp, filename, "r");
 	if ( !fp )
 		return data;
 	fseek( fp, 0, SEEK_END );

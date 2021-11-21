@@ -1,6 +1,8 @@
 #ifndef HASH_MAP_H
 #define HASH_MAP_H
 
+#include "std.h"
+
 #include <string.h>
 #include <assert.h>
 #include "memory.h"
@@ -185,7 +187,7 @@ HM_STATIC struct hash_bucket_entry *hash_bucket_entry_create(const char *key, un
 	entry->hash = hashed_key;
 	int kl = strlen(key);
 	entry->key = memory_allocate(kl + 1); //DON'T FORGET TO FREE THIS KEY
-	strncpy_s(entry->key, kl + 1, key, kl);
+	std_strncpy_s(entry->key, kl + 1, key, kl);
 	entry->next = NULL;
 	memcpy(entry->data, data, data_size);
 	return entry;
