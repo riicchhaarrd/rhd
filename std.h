@@ -23,6 +23,7 @@ int std_strncpy_s(char *dest, size_t destsz, const char *src, size_t count)
 		strncpy_s(dest, destsz, src, count);
 	#else
 		strncpy(dest, src, count);
+		dest[destsz - 1] = 0;
 	#endif
 	return 0;
 }
