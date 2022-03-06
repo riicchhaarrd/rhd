@@ -31,7 +31,7 @@ struct hash_bucket
 };
 
 #define HASH_BUCKET_SIZE (16)
-#define HASH_LOAD_FACTOR (0.75)
+#define HASH_LOAD_FACTOR (1)
 
 struct hash_map
 {
