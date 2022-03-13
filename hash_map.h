@@ -223,7 +223,7 @@ HM_STATIC struct hash_bucket_entry *hash_bucket_entry_create(struct hash_map *hm
 	int kl = strlen(key);
 	
 	if(hm->custom_allocator_fn && hm->custom_allocator_userptr)
-		entry = hm->custom_allocator_fn(hm->custom_allocator_userptr, kl + 1);
+		entry->key = hm->custom_allocator_fn(hm->custom_allocator_userptr, kl + 1);
 	else
 		entry->key = memory_allocate(kl + 1); //DON'T FORGET TO FREE THIS KEY
 	
