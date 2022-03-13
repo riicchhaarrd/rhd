@@ -26,6 +26,8 @@ struct linked_list
 	struct linked_list_node *tail;
 	size_t data_size;
 	linked_list_node_finalizer_callback_t on_node_delete_fn;
+	void *custom_allocator_userptr;
+	custom_allocator_fn_t custom_allocator_fn;
 };
 
 #define linked_list_foreach(list, type, var_name, body) \
@@ -62,6 +64,9 @@ struct linked_list
 #define linked_list_create(type) \
 	linked_list_create_with_data_size(sizeof(type))
 	
+#define linked_list_create_with_custom_allocator(type, userptr, allocator_fn) \
+	linked_list_create_with_data_size_and_custom_allocator(sizeof(type), userptr, allocator_fn)
+	
 #define linked_list_append(list, value) \
 	linked_list_append_((list), (unsigned char*)&(value), sizeof(value))
 	
@@ -73,6 +78,7 @@ struct linked_list
 	
 #ifndef LINKED_LIST_IMPL
 extern struct linked_list* linked_list_create_with_data_size(size_t data_size);
+extern struct linked_list* linked_list_create_with_data_size_and_custom_allocator(size_t data_size, void *userptr, custom_allocator_fn_t allocator_fn);
 extern void linked_list_destroy(struct linked_list **list);
 extern void linked_list_free_with_deleter(struct linked_list *list, linked_list_node_finalizer_callback_t fn);
 extern void* linked_list_append_(struct linked_list *list, unsigned char *data, size_t data_size);
@@ -94,6 +100,8 @@ void linked_list_init_with_data_size(struct linked_list *list, size_t data_size)
 	list->tail = NULL;
 	list->data_size = data_size;
 	list->on_node_delete_fn = NULL;
+	list->custom_allocator_userptr = NULL;
+	list->custom_allocator_fn = NULL;
 }
 
 struct linked_list *linked_list_create_with_data_size(size_t data_size)
@@ -103,14 +111,27 @@ struct linked_list *linked_list_create_with_data_size(size_t data_size)
 	return list;
 }
 
-struct linked_list_node *linked_list_create_node_(unsigned char *data, size_t data_size)
+struct linked_list *linked_list_create_with_data_size_and_custom_allocator(size_t data_size, void *userptr, custom_allocator_fn_t allocator_fn)
 {
-	struct linked_list_node *list = memory_allocate(sizeof(struct linked_list_node) + data_size);
-	list->next = NULL;
-	list->prev = NULL;
-	list->data_size = data_size;
-	memcpy(list->data, data, data_size);
+	struct linked_list *list = allocator_fn(userptr, sizeof(struct linked_list));
+	linked_list_init_with_data_size(list, data_size);
+	list->custom_allocator_userptr = userptr;
+	list->custom_allocator_fn = allocator_fn;
 	return list;
+}
+
+struct linked_list_node *linked_list_create_node_(struct linked_list *list, unsigned char *data, size_t data_size)
+{
+	struct linked_list_node *n = NULL;
+	if(list->custom_allocator_fn && list->custom_allocator_userptr)
+		n = list->custom_allocator_fn(list->custom_allocator_userptr, sizeof(struct linked_list_node) + data_size);
+	else
+		n = memory_allocate(sizeof(struct linked_list_node) + data_size);
+	n->next = NULL;
+	n->prev = NULL;
+	n->data_size = data_size;
+	memcpy(n->data, data, data_size);
+	return n;
 }
 
 int linked_list_erase_node(struct linked_list *list, struct linked_list_node *node)
@@ -148,11 +169,11 @@ void* linked_list_prepend_(struct linked_list *list, unsigned char *data, size_t
 	
 	if(list->head == NULL)
 	{
-		list->tail = list->head = linked_list_create_node_(data, data_size);
+		list->tail = list->head = linked_list_create_node_(list, data, data_size);
 		return list->head->data;
 	}
 	
-	struct linked_list_node *new_node = linked_list_create_node_(data, data_size);
+	struct linked_list_node *new_node = linked_list_create_node_(list, data, data_size);
 	struct linked_list_node *current_node = list->head;
 	
 	//make the new_node point to the current_node
@@ -170,7 +191,7 @@ void* linked_list_append_(struct linked_list *list, unsigned char *data, size_t 
 	
 	if(list->head == NULL)
 	{
-		list->tail = list->head = linked_list_create_node_(data, data_size);
+		list->tail = list->head = linked_list_create_node_(list, data, data_size);
 		return list->head->data;
 	}
 	struct linked_list_node *cur = list->head;
@@ -180,7 +201,7 @@ void* linked_list_append_(struct linked_list *list, unsigned char *data, size_t 
 			break;
 		cur = cur->next;
 	}
-	struct linked_list_node *new_node = linked_list_create_node_(data, data_size);
+	struct linked_list_node *new_node = linked_list_create_node_(list, data, data_size);
 	new_node->prev = cur;
 	cur->next = new_node;
 	list->tail = new_node;
