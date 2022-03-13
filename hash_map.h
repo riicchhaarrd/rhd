@@ -53,6 +53,21 @@ extern int hash_map_insert_data(struct hash_map *ht, const char *key, unsigned c
 extern void hash_map_dump(struct hash_map *hm);
 extern void hash_map_set_on_key_removal(struct hash_map *hm, deallocator_t fn);
 extern int hash_map_remove_key(struct hash_map **hmp, const char *key);
+
+#define hash_map_foreach_entry(hm, entry, body) \
+	do { \
+		for(size_t i = 0; i < hm->bucket_size; ++i) \
+		{ \
+			struct hash_bucket *bucket = &hm->buckets[i]; \
+			if(bucket->head == NULL) continue; \
+			struct hash_bucket_entry *entry = bucket->head; \
+			while(entry) \
+			{ \
+				body \
+				entry = entry->next; \
+			} \
+		} \
+	} while(0)
 #else
 
 void hash_map_set_on_key_removal(struct hash_map *hm, deallocator_t fn)
